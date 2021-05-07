@@ -1,11 +1,11 @@
 #![feature(proc_macro_hygiene, decl_macro)]
-use rocket_authz;
 use casbin::{DefaultModel, FileAdapter};
 use rocket::{
     get,
+    http::{Cookie, Cookies},
     routes,
-    http::{Cookies, Cookie},
 };
+use rocket_authz;
 
 #[get("/login")]
 fn login(mut cookies: Cookies) -> &'static str {
@@ -25,13 +25,15 @@ fn data2(_g: rocket_authz::CasbinGuard) -> &'static str {
 
 fn rocket() -> rocket::Rocket {
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let m = match rt.block_on(DefaultModel::from_file("examples/rbac_with_pattern_model.conf")) {
+    let m = match rt.block_on(DefaultModel::from_file(
+        "examples/rbac_with_pattern_model.conf",
+    )) {
         Ok(m) => m,
         Err(_) => panic!(""),
     };
     let a = FileAdapter::new("examples/rbac_with_pattern_policy.csv");
-    
-    let casbin_fairing = match rt.block_on(rocket_authz::CasbinFairing::new(m, a)){
+
+    let casbin_fairing = match rt.block_on(rocket_authz::CasbinFairing::new(m, a)) {
         Ok(f) => f,
         Err(_) => panic!(""),
     };
@@ -43,8 +45,8 @@ fn rocket() -> rocket::Rocket {
 #[cfg(test)]
 mod test {
     use super::rocket;
+    use rocket::http::Status;
     use rocket::local::Client;
-    use rocket::http::Status; 
 
     #[test]
     fn login_data2() {

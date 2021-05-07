@@ -1,13 +1,13 @@
 use rocket::{
-    fairing::{Info, Kind, Fairing},
+    fairing::{Fairing, Info, Kind},
+    http::Status,
     request::{self, FromRequest, Request},
     Data,
-    http::{Status},
 };
 
-use std::sync::{Arc, RwLock};
 use casbin::prelude::*;
 use casbin::{CachedEnforcer, CoreApi, Result as CasbinResult};
+use std::sync::{Arc, RwLock};
 
 #[derive(Clone)]
 pub struct CasbinGuard(Option<Status>);
@@ -17,7 +17,9 @@ impl<'a, 'r> FromRequest<'a, 'r> for CasbinGuard {
 
     fn from_request(request: &'a Request<'r>) -> request::Outcome<CasbinGuard, ()> {
         match *request.local_cache(|| CasbinGuard(Status::from_code(0))) {
-            CasbinGuard(Some(Status::Ok)) => request::Outcome::Success(CasbinGuard(Some(Status::Ok))),
+            CasbinGuard(Some(Status::Ok)) => {
+                request::Outcome::Success(CasbinGuard(Some(Status::Ok)))
+            }
             CasbinGuard(Some(err_status)) => request::Outcome::Failure((err_status, ())),
             _ => request::Outcome::Failure((Status::BadGateway, ())),
         }
@@ -26,14 +28,14 @@ impl<'a, 'r> FromRequest<'a, 'r> for CasbinGuard {
 
 #[derive(Clone)]
 pub struct CasbinFairing {
-    pub enforcer: Arc<RwLock<CachedEnforcer>>
+    pub enforcer: Arc<RwLock<CachedEnforcer>>,
 }
 
 impl CasbinFairing {
     pub async fn new<M: TryIntoModel, A: TryIntoAdapter>(m: M, a: A) -> CasbinResult<Self> {
         let enforcer: CachedEnforcer = CachedEnforcer::new(m, a).await?;
         Ok(CasbinFairing {
-                enforcer: Arc::new(RwLock::new(enforcer)),
+            enforcer: Arc::new(RwLock::new(enforcer)),
         })
     }
 
@@ -42,13 +44,12 @@ impl CasbinFairing {
     }
 
     pub fn set_enforcer(e: Arc<RwLock<CachedEnforcer>>) -> CasbinFairing {
-        CasbinFairing{enforcer: e}
+        CasbinFairing { enforcer: e }
     }
 }
 
 impl Fairing for CasbinFairing {
-    
-    fn info(&self) -> Info { 
+    fn info(&self) -> Info {
         Info {
             name: "Casbin Fairing",
             kind: Kind::Request | Kind::Response,
@@ -71,7 +72,7 @@ impl Fairing for CasbinFairing {
                 match lock.enforce_mut(vec![subject_str, domain_str, path, action]) {
                     Ok(true) => {
                         drop(lock);
-                        request.local_cache(||{CasbinGuard(Some(Status::Ok))});
+                        request.local_cache(|| CasbinGuard(Some(Status::Ok)));
                     }
                     Ok(false) => {
                         drop(lock);
@@ -88,7 +89,7 @@ impl Fairing for CasbinFairing {
                 match lock.enforce_mut(vec![subject_str, path, action]) {
                     Ok(true) => {
                         drop(lock);
-                        request.local_cache(||{CasbinGuard(Some(Status::Ok))});
+                        request.local_cache(|| CasbinGuard(Some(Status::Ok)));
                     }
                     Ok(false) => {
                         drop(lock);
