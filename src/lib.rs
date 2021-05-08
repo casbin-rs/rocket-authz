@@ -9,6 +9,20 @@ use casbin::prelude::*;
 use casbin::{CachedEnforcer, CoreApi, Result as CasbinResult};
 use std::sync::{Arc, RwLock};
 
+pub struct CasbinVals {
+    pub subject: Option<String>,
+    pub domain: Option<String>,
+}
+
+impl CasbinVals {
+    pub fn new(subject: Option<String>, domain: Option<String>) -> CasbinVals {
+        CasbinVals {
+            subject: subject,
+            domain: domain,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct CasbinGuard(Option<Status>);
 
@@ -60,16 +74,26 @@ impl Fairing for CasbinFairing {
         let cloned_enforce = self.enforcer.clone();
         let path = request.uri().path().to_owned();
         let action = request.method().as_str().to_owned();
-        // Get subject and domain from cookie.
-        let subject = request.cookies().get("subject").map(|x| x.to_owned());
-        let domain = request.cookies().get("domain").map(|x| x.to_owned());
+
+        let (subject, domain) = match request.local_cache(|| CasbinVals {
+            subject: None,
+            domain: None,
+        }) {
+            CasbinVals {
+                subject: Some(x),
+                domain: Some(y),
+            } => (Some(x.to_owned()), Some(y.to_owned())),
+            CasbinVals {
+                subject: Some(x),
+                domain: None,
+            } => (Some(x.to_owned()), None),
+            _ => (None, None),
+        };
 
         if let Some(subject) = subject {
             if let Some(domain) = domain {
-                let subject_str = subject.value().to_string();
-                let domain_str = domain.value().to_string();
                 let mut lock = cloned_enforce.write().unwrap();
-                match lock.enforce_mut(vec![subject_str, domain_str, path, action]) {
+                match lock.enforce_mut(vec![subject, domain, path, action]) {
                     Ok(true) => {
                         drop(lock);
                         request.local_cache(|| CasbinGuard(Some(Status::Ok)));
@@ -84,9 +108,8 @@ impl Fairing for CasbinFairing {
                     }
                 };
             } else {
-                let subject_str = subject.value().to_string();
                 let mut lock = cloned_enforce.write().unwrap();
-                match lock.enforce_mut(vec![subject_str, path, action]) {
+                match lock.enforce_mut(vec![subject, path, action]) {
                     Ok(true) => {
                         drop(lock);
                         request.local_cache(|| CasbinGuard(Some(Status::Ok)));

@@ -1,16 +1,26 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 use casbin::{DefaultModel, FileAdapter};
 use rocket::{
+    fairing::{Fairing, Info, Kind},
     get,
-    http::{Cookie, Cookies},
-    routes,
+    request::Request,
+    routes, Data,
 };
 use rocket_authz;
 
-#[get("/login")]
-fn login(mut cookies: Cookies) -> &'static str {
-    cookies.add(Cookie::new("subject", "alice"));
-    "success"
+struct FakeAuthFairing;
+
+impl Fairing for FakeAuthFairing {
+    fn info(&self) -> Info {
+        Info {
+            name: "Fake Auth Fairing",
+            kind: Kind::Request | Kind::Response,
+        }
+    }
+
+    fn on_request(&self, request: &mut Request, _data: &Data) {
+        request.local_cache(|| rocket_authz::CasbinVals::new(Some("alice".to_string()), None));
+    }
 }
 
 #[get("/data1")]
@@ -37,9 +47,11 @@ fn rocket() -> rocket::Rocket {
         Ok(f) => f,
         Err(_) => panic!(""),
     };
+    let fake_auth_fairing = FakeAuthFairing;
     rocket::ignite()
+        .attach(fake_auth_fairing)
         .attach(casbin_fairing)
-        .mount("/", routes![login, data1, data2])
+        .mount("/", routes![data1, data2])
 }
 
 #[cfg(test)]
@@ -51,9 +63,6 @@ mod test {
     #[test]
     fn login_data2() {
         let client = Client::new(rocket()).expect("valid rocket instance");
-        let req = client.get("/login");
-        let response = req.dispatch();
-        assert_eq!(response.status(), Status::Ok);
         let req = client.get("/data2");
         let response = req.dispatch();
         assert_eq!(response.status(), Status::Ok);
