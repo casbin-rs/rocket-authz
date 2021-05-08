@@ -16,10 +16,7 @@ pub struct CasbinVals {
 
 impl CasbinVals {
     pub fn new(subject: Option<String>, domain: Option<String>) -> CasbinVals {
-        CasbinVals {
-            subject: subject,
-            domain: domain,
-        }
+        CasbinVals { subject, domain }
     }
 }
 
