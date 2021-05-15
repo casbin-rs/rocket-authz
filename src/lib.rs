@@ -7,7 +7,8 @@ use rocket::{
 
 use casbin::prelude::*;
 use casbin::{CachedEnforcer, CoreApi, Result as CasbinResult};
-use std::sync::{Arc, RwLock};
+use parking_lot::RwLock;
+use std::sync::Arc;
 
 pub struct CasbinVals {
     pub subject: Option<String>,
@@ -89,7 +90,7 @@ impl Fairing for CasbinFairing {
 
         if let Some(subject) = subject {
             if let Some(domain) = domain {
-                let mut lock = cloned_enforce.write().unwrap();
+                let mut lock = cloned_enforce.write();
                 match lock.enforce_mut(vec![subject, domain, path, action]) {
                     Ok(true) => {
                         drop(lock);
@@ -105,7 +106,7 @@ impl Fairing for CasbinFairing {
                     }
                 };
             } else {
-                let mut lock = cloned_enforce.write().unwrap();
+                let mut lock = cloned_enforce.write();
                 match lock.enforce_mut(vec![subject, path, action]) {
                     Ok(true) => {
                         drop(lock);
