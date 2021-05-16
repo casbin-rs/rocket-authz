@@ -1,5 +1,12 @@
 # Rocket Casbin Middleware
+
+[![Crates.io](https://meritbadge.herokuapp.com/rocket-authz)](https://crates.io/crates/rocket-authz)
+[![Docs](https://docs.rs/rocket-authz/badge.svg)](https://docs.rs/rocket-authz)
+[![CI](https://github.com/casbin-rs/rocket-authz/workflows/CI/badge.svg)](https://github.com/casbin-rs/rocket-authz/actions)
+[![codecov](https://codecov.io/gh/casbin-rs/rocket-authz/branch/master/graph/badge.svg)](https://codecov.io/gh/casbin-rs/rocket-authz)
+
 [Casbin](https://github.com/casbin/casbin-rs) access control middleware for [Rocket](https://github.com/SergioBenitez/Rocket) framework
+
 ## Install
 Add it to `Cargo.toml`
 
